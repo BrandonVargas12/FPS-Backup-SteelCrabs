@@ -4,8 +4,8 @@ using UnityEngine;
 
 public class camera : MonoBehaviour
 {
-    [SerializeField] int sensHor;
-    [SerializeField] int sensVert;
+    [SerializeField] int sensHor = 600;
+    [SerializeField] int sensVert = 600;
 
     [SerializeField] int lockVertMin;
     [SerializeField] int lockVertMax;
@@ -23,6 +23,9 @@ public class camera : MonoBehaviour
     // Update is called once per frame
     void LateUpdate()
     {
+        sensHor = gameManager.instance.sensHor;
+        sensVert = gameManager.instance.sensVert;
+        
         // Get the Input
         float mouseX = Input.GetAxis("Mouse X") * Time.deltaTime * sensHor;
         float mouseY = Input.GetAxis("Mouse Y") * Time.deltaTime * sensVert;

@@ -9,19 +9,23 @@ public class enemyAI : MonoBehaviour, IDamageable
     [SerializeField] NavMeshAgent agent;
     [SerializeField] Renderer rend;
     [SerializeField] Animator anim;
+    [SerializeField] GameObject HeadPosition;
+    [SerializeField] GameObject medKitToDrop;
 
     [Header("----- Enemy Stats -----")]
-    [Range(1, 10)] [SerializeField] int hP;
-    [Range(1, 10)] [SerializeField] float speedChase;
-    [Range(1, 10)] [SerializeField] int playerFaceSpeed;
-    [Range(1, 50)] [SerializeField] int roamRadius;
-    [Range(1, 180)] [SerializeField] int viewAngle;
+    [Range(1, 10)][SerializeField] int hP;
+    [Range(1, 10)][SerializeField] float speedChase;
+    [Range(1, 10)][SerializeField] int playerFaceSpeed;
+    [Range(1, 50)][SerializeField] int roamRadius;
+    [Range(1, 180)][SerializeField] int viewAngle;
+    public bool roamingEnemy;
 
     [Header("----- Weapon Stats -----")]
     [SerializeField] float fireRate;
     [SerializeField] GameObject bullet;
     [SerializeField] Transform bulletPos;
-    
+
+    public GameObject enemyPrefab;
     Vector3 playerDir;
     bool isShooting;
     bool takingDmg;
@@ -32,10 +36,15 @@ public class enemyAI : MonoBehaviour, IDamageable
     Vector3 startingPos;
     bool roamPathValid;
     float angle;
+    System.Random rand = new System.Random();
+    int randy;
+    int hpOG;
+    bool respawnEnemy;
 
     // Start is called before the first frame update
     void Start()
     {
+        hpOG = hP;
         lastPlayerPos = transform.position;
         stoppingDistanceOrig = agent.stoppingDistance;
         speedOrig = agent.speed;
@@ -45,20 +54,25 @@ public class enemyAI : MonoBehaviour, IDamageable
     // Update is called once per frame
     void Update()
     {
-        if (agent.enabled)
+        if (!gameManager.instance.isFiringRange && agent.enabled)
         {
             angle = Vector3.Angle(playerDir, transform.forward);
-            playerDir = gameManager.instance.player.transform.position - transform.position;
+            playerDir = gameManager.instance.player.transform.position - HeadPosition.transform.position; playerDir.y += 1;
 
             anim.SetFloat("Speed", Mathf.Lerp(anim.GetFloat("Speed"), agent.velocity.normalized.magnitude, Time.deltaTime * 4));
             if (!takingDmg)
             {
+                if (!roamingEnemy)
+                {
+                    agent.stoppingDistance = stoppingDistanceOrig;
+                    agent.SetDestination(gameManager.instance.player.transform.position);
+                }
                 if (playerInRange)
                 {
                     canSeePlayer();
-
                 }
-                if (agent.remainingDistance < 0.1f && agent.destination != gameManager.instance.player.transform.position)
+
+                if (agent.remainingDistance < 0.1f && agent.destination != gameManager.instance.player.transform.position && roamingEnemy)
                 {
                     roam();
                 }
@@ -92,19 +106,19 @@ public class enemyAI : MonoBehaviour, IDamageable
     }
     private void OnTriggerExit(Collider other)
     {
-        if (other.CompareTag("Player"))
+        if (roamingEnemy && other.CompareTag("Player"))
         {
-            playerInRange = false;
             lastPlayerPos = gameManager.instance.player.transform.position;
             agent.stoppingDistance = 0;
         }
+        playerInRange = false;
     }
 
     void FacePlayer()
     {
-        playerDir.y = 0;
+        //playerDir.y = 0;
         Quaternion rotation = Quaternion.LookRotation(playerDir);
-        transform.rotation = Quaternion.Lerp(transform.rotation, rotation,Time.deltaTime * playerFaceSpeed);
+        transform.rotation = Quaternion.Lerp(transform.rotation, rotation, Time.deltaTime * playerFaceSpeed);
     }
 
     void canSeePlayer()
@@ -112,9 +126,9 @@ public class enemyAI : MonoBehaviour, IDamageable
         float angle = Vector3.Angle(playerDir, transform.forward);
         RaycastHit hit;
 
-        if (Physics.Raycast(transform.position + transform.up * 1.5f, playerDir, out hit))
+        if (Physics.Raycast(HeadPosition.transform.position, playerDir, out hit))
         {
-            Debug.DrawRay(transform.position + transform.up, playerDir);
+            Debug.DrawRay(HeadPosition.transform.position, playerDir);
             if (hit.collider.CompareTag("Player") && angle <= viewAngle)
             {
                 agent.SetDestination(gameManager.instance.player.transform.position);
@@ -171,16 +185,33 @@ public class enemyAI : MonoBehaviour, IDamageable
         isShooting = true;
 
         Instantiate(bullet, bulletPos.position, transform.rotation);
-        
+
         yield return new WaitForSeconds(fireRate);
         isShooting = false;
     }
+
     void enemyDead()
     {
-        gameManager.instance.EnemyDecrement();
+        randy = rand.Next(10000);
+        if (!gameManager.instance.isFiringRange && randy > 7000) Instantiate(medKitToDrop, transform.position, transform.rotation);
+
+
         anim.SetBool("Dead", true);
         agent.enabled = false;
+        //if (gameManager.instance.isFiringRange && !respawnEnemy)
+        //{
+        //    StartCoroutine(EnemyRespawn());
+        //    respawnEnemy = true;
+        //}
         foreach (Collider col in GetComponents<Collider>())
+        {
             col.enabled = false;
+        }
+
+    }
+    IEnumerator EnemyRespawn()
+    {
+        yield return new WaitForSeconds(2f);
+        // respawn enemy in the same position with all necessary statistics (health)
     }
 }
